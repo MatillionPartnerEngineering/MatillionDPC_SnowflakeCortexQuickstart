@@ -1,3 +1,222 @@
 type: "transformation"
 version: "1.0"
-pipeline: {}
+pipeline:
+  components:
+    TASTY_BYTE_SALES:
+      type: "table-input"
+      parameters:
+        componentName: "TASTY_BYTE_SALES"
+        database: "[Environment Default]"
+        schema: "[Environment Default]"
+        targetTable: "TASTY_BYTE_SALES"
+        columnNames:
+        - "DATE"
+        - "PRIMARY_CITY"
+        - "MENU_ITEM_NAME"
+        - "TOTAL_SOLD"
+        timeOffset:
+    Filter:
+      type: "filter"
+      sources:
+      - "TASTY_BYTE_SALES"
+      parameters:
+        componentName: "Filter"
+        filterConditions:
+        - - "DATE"
+          - "Is"
+          - "Greater than or equal to"
+          - "2022-05-28"
+        combineCondition: "And"
+    Calculator:
+      type: "calculator"
+      sources:
+      - "Filter"
+      parameters:
+        componentName: "Calculator"
+        includeInputColumns: "Yes"
+        calculations:
+        - - "to_timestamp_ntz(\"DATE\")"
+          - "DATE"
+    Rename:
+      type: "rename"
+      sources:
+      - "Calculator"
+      parameters:
+        componentName: "Rename"
+        columnMapping:
+        - - "PRIMARY_CITY"
+          - "PRIMARY_CITY"
+        - - "MENU_ITEM_NAME"
+          - "MENU_ITEM_NAME"
+        - - "TOTAL_SOLD"
+          - "TOTAL_SOLD"
+        - - "DATE"
+          - "TIMESTAMP"
+        includeInputColumns: "No"
+    Filter Lobster Mac & Cheese:
+      type: "filter"
+      sources:
+      - "Rename"
+      parameters:
+        componentName: "Filter Lobster Mac & Cheese"
+        filterConditions:
+        - - "MENU_ITEM_NAME"
+          - "Is"
+          - "Equal to"
+          - "Lobster Mac & Cheese"
+        combineCondition: "And"
+    Filter data > 1 month ago:
+      type: "filter"
+      sources:
+      - "Rename"
+      parameters:
+        componentName: "Filter data > 1 month ago"
+        filterConditions:
+        - - "TIMESTAMP"
+          - "Is"
+          - "Greater than or equal to"
+          - "2023-04-28"
+        combineCondition: "And"
+    Filter data < 1 month ago:
+      type: "filter"
+      sources:
+      - "Rename"
+      parameters:
+        componentName: "Filter data < 1 month ago"
+        filterConditions:
+        - - "TIMESTAMP"
+          - "Is"
+          - "Less than"
+          - "2023-04-28"
+        combineCondition: "And"
+    Isolate Columns:
+      type: "calculator"
+      sources:
+      - "Filter Lobster Mac & Cheese"
+      parameters:
+        componentName: "Isolate Columns"
+        includeInputColumns: "No"
+        calculations:
+        - - "\"TIMESTAMP\""
+          - "TIMESTAMP"
+        - - "\"TOTAL_SOLD\""
+          - "TOTAL_SOLD"
+    Create View vancouver_anomaly_analysis_set:
+      type: "create-view"
+      sources:
+      - "Filter data > 1 month ago"
+      parameters:
+        componentName: "Create View vancouver_anomaly_analysis_set"
+        database: "[Environment Default]"
+        schema: "[Environment Default]"
+        viewName: "vancouver_anomaly_analysis_set"
+        secureView: "No"
+        viewType: "Standard"
+    Create view vancouver_anomaly_training_set:
+      type: "create-view"
+      sources:
+      - "Filter data < 1 month ago"
+      parameters:
+        componentName: "Create view vancouver_anomaly_training_set"
+        database: "[Environment Default]"
+        schema: "[Environment Default]"
+        viewName: "vancouver_anomaly_training_set"
+        secureView: "No"
+        viewType: "Standard"
+    Create View lobster_sales:
+      type: "create-view"
+      sources:
+      - "Isolate Columns"
+      parameters:
+        componentName: "Create View lobster_sales"
+        database: "[Environment Default]"
+        schema: "[Environment Default]"
+        viewName: "lobster_sales"
+        secureView: "No"
+        viewType: "Standard"
+design:
+  components:
+    TASTY_BYTE_SALES:
+      position:
+        x: 220
+        "y": 60
+      tempMetlId: 1
+    Filter:
+      position:
+        x: 400
+        "y": 60
+      tempMetlId: 2
+    Calculator:
+      position:
+        x: 590
+        "y": 60
+      tempMetlId: 3
+    Rename:
+      position:
+        x: 770
+        "y": 60
+      tempMetlId: 4
+    Filter Lobster Mac & Cheese:
+      position:
+        x: 940
+        "y": -60
+      tempMetlId: 5
+    Filter data > 1 month ago:
+      position:
+        x: 940
+        "y": 60
+      tempMetlId: 6
+    Filter data < 1 month ago:
+      position:
+        x: 940
+        "y": 180
+      tempMetlId: 7
+    Isolate Columns:
+      position:
+        x: 1100
+        "y": -60
+      tempMetlId: 8
+    Create View vancouver_anomaly_analysis_set:
+      position:
+        x: 1100
+        "y": 60
+      tempMetlId: 9
+    Create view vancouver_anomaly_training_set:
+      position:
+        x: 1100
+        "y": 180
+      tempMetlId: 10
+    Create View lobster_sales:
+      position:
+        x: 1260
+        "y": -60
+      tempMetlId: 11
+  notes:
+    "1":
+      position:
+        x: 340
+        "y": -10
+      size:
+        height: 138
+        width: 160
+      theme: "white"
+      content: "filter for latest years' worth of data"
+    "2":
+      position:
+        x: 530
+        "y": -60
+      size:
+        height: 188
+        width: 160
+      theme: "white"
+      content: "converting from date to timestamp datatype is needed for the Forecast\
+        \ function"
+    "3":
+      position:
+        x: 720
+        "y": -30
+      size:
+        height: 158
+        width: 150
+      theme: "white"
+      content: "rename date --> timestamp"

@@ -4,8 +4,149 @@ pipeline:
   components:
     Start:
       type: "start"
+      transitions:
+        unconditional:
+        - "Run Create Training Datasets"
       parameters:
         componentName: "Start"
+    Run Create Training Datasets:
+      type: "run-transformation"
+      transitions:
+        success:
+        - "Create lobstermac_forecast"
+        - "Create vancouver_anomaly_model"
+      parameters:
+        componentName: "Run Create Training Datasets"
+        transformationJob: "Create Training Datasets"
+        setScalarVariables:
+        setGridVariables:
+    Create lobstermac_forecast:
+      type: "sql-script"
+      transitions:
+        success:
+        - "Execute lobstermac_forecast & store results"
+      parameters:
+        componentName: "Create lobstermac_forecast"
+        sqlScript: |-
+          CREATE OR REPLACE forecast quickstart.ml_functions.lobstermac_forecast (
+              INPUT_DATA => SYSTEM$REFERENCE('VIEW', '"lobster_sales"'),
+              TIMESTAMP_COLNAME => 'TIMESTAMP',
+              TARGET_COLNAME => 'TOTAL_SOLD'
+          );
+    Execute lobstermac_forecast & store results:
+      type: "sql-script"
+      transitions:
+        success:
+        - "And"
+        failure:
+        - "Or"
+      parameters:
+        componentName: "Execute lobstermac_forecast & store results"
+        sqlScript: "-- Create predictions, and save results to a table:  \nCALL lobstermac_forecast!FORECAST(FORECASTING_PERIODS\
+          \ => 10);\n\n-- Run immediately after the above call to store results!\n\
+          CREATE OR REPLACE TABLE macncheese_predictions AS (\n    SELECT\n      \
+          \  *\n    FROM\n        TABLE(RESULT_SCAN(-1))\n);"
+    Create vancouver_anomaly_model:
+      type: "sql-script"
+      transitions:
+        success:
+        - "Execute vancouver_anomaly_model"
+      parameters:
+        componentName: "Create vancouver_anomaly_model"
+        sqlScript: "CREATE OR REPLACE anomaly_detection QUICKSTART.ML_FUNCTIONS.vancouver_anomaly_model(\n\
+          \    INPUT_DATA => SYSTEM$REFERENCE('VIEW', '\"vancouver_anomaly_training_set\"\
+          '),\n    SERIES_COLNAME => 'MENU_ITEM_NAME',\n    TIMESTAMP_COLNAME => 'TIMESTAMP',\n\
+          \    TARGET_COLNAME => 'TOTAL_SOLD',\n    LABEL_COLNAME => ''\n); "
+    Execute vancouver_anomaly_model:
+      type: "sql-script"
+      transitions:
+        success:
+        - "And"
+        failure:
+        - "Or"
+      parameters:
+        componentName: "Execute vancouver_anomaly_model"
+        sqlScript: "-- Call the model and store the results into table:\nCALL QUICKSTART.ML_FUNCTIONS.vancouver_anomaly_model!DETECT_ANOMALIES(\n\
+          \    INPUT_DATA => SYSTEM$REFERENCE('VIEW', 'QUICKSTART.ML_FUNCTIONS.\"\
+          vancouver_anomaly_analysis_set\"'),\n    SERIES_COLNAME => 'MENU_ITEM_NAME',\n\
+          \    TIMESTAMP_COLNAME => 'TIMESTAMP',\n    TARGET_COLNAME => 'TOTAL_SOLD'\n\
+          \    --,CONFIG_OBJECT => {'prediction_interval': 0.95}\n);\n\nCREATE OR\
+          \ REPLACE TABLE vancouver_anomalies AS (\n    SELECT\n        *\n    FROM\
+          \ \n        TABLE(RESULT_SCAN(-1))\n);"
+    And:
+      type: "and"
+      transitions:
+        unconditional:
+        - "Query Result To Scalar"
+      parameters:
+        componentName: "And"
+    Or:
+      type: "or"
+      transitions:
+        unconditional:
+        - "Send Failure Email "
+      parameters:
+        componentName: "Or"
+    Query Result To Scalar:
+      type: "query-to-scalar"
+      transitions:
+        unconditional:
+        - "Send Success Email"
+      parameters:
+        componentName: "Query Result To Scalar"
+        mode: "Advanced"
+        query: "WITH TOP_ANOMALY AS (SELECT series, is_anomaly, count(is_anomaly)\
+          \ AS num_records\nFROM vancouver_anomalies\nWHERE is_anomaly =1\nGROUP BY\
+          \ ALL\nORDER BY num_records DESC\nLIMIT 1) \nSELECT CONCAT(SERIES, ' : ',\
+          \ NUM_RECORDS) AS TOP_ANOMALY_COUNT\nFROM TOP_ANOMALY"
+        scalarVariableMapping:
+        - - "PV_TOP_ANOMALY"
+          - "TOP_ANOMALY_COUNT"
+    Send Success Email:
+      type: "send-email"
+      parameters:
+        componentName: "Send Success Email"
+        toRecipients:
+        - - "karey.graham@matillion.com"
+        ccRecipients:
+        subject: "Matillion Pipeline Ran Successfully"
+        message: |-
+          Top Anomaly Detected:
+
+          ${PV_TOP_ANOMALY}
+        senderAddress: "karey.graham@gmail.com"
+        replyAddress:
+        smtpUsername: "karey.graham@gmail.com"
+        smtpPassword: "kg_smtp"
+        smtpHostname: "smtp.gmail.com"
+        smtpPort: "465"
+        enableSslTls: "Yes"
+        enableStarttls: "No"
+    'Send Failure Email ':
+      type: "send-email"
+      parameters:
+        componentName: "Send Failure Email "
+        toRecipients:
+        - - "karey.graham@matillion.com"
+        ccRecipients:
+        subject: "Matillion Pipeline Failed"
+        message: "Please go to designer.matillion.com to fix a pipeline."
+        senderAddress: "karey.graham@gmail.com"
+        replyAddress:
+        smtpUsername: "karey.graham@gmail.com"
+        smtpPassword: "kg_smtp"
+        smtpHostname: "smtp.gmail.com"
+        smtpPort: "465"
+        enableSslTls: "Yes"
+        enableStarttls: "No"
+  variables:
+    PV_TOP_ANOMALY:
+      metadata:
+        type: "TEXT"
+        description: ""
+        scope: "COPIED"
+        visibility: "PUBLIC"
+      defaultValue: "DEFAULT"
 design:
   components:
     Start:
@@ -13,3 +154,53 @@ design:
         x: 0
         "y": 0
       tempMetlId: 1
+    Run Create Training Datasets:
+      position:
+        x: 160
+        "y": 0
+      tempMetlId: 2
+    Create lobstermac_forecast:
+      position:
+        x: 310
+        "y": 0
+      tempMetlId: 3
+    Execute lobstermac_forecast & store results:
+      position:
+        x: 470
+        "y": 0
+      tempMetlId: 4
+    Create vancouver_anomaly_model:
+      position:
+        x: 310
+        "y": 140
+      tempMetlId: 5
+    Execute vancouver_anomaly_model:
+      position:
+        x: 470
+        "y": 140
+      tempMetlId: 6
+    And:
+      position:
+        x: 630
+        "y": 0
+      tempMetlId: 7
+    Or:
+      position:
+        x: 630
+        "y": 140
+      tempMetlId: 8
+    Query Result To Scalar:
+      position:
+        x: 790
+        "y": 0
+      tempMetlId: 9
+    Send Success Email:
+      position:
+        x: 940
+        "y": 0
+      tempMetlId: 11
+    'Send Failure Email ':
+      position:
+        x: 790
+        "y": 140
+      tempMetlId: 12
