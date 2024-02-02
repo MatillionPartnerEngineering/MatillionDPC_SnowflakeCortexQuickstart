@@ -1,4 +1,4 @@
-# Snowflake Cortex Quickstart
+# Matillion Data Productivity Cloud - Snowflake Cortex Quickstart
 
 This repository contains a job created in Matillion Data Productivity Cloud. It follows the buildout of Snowflake Cortex functionality as dictated in the [Snowflake Quickstart](https://quickstarts.snowflake.com/guide/ml_forecasting_ad/index.html?index=..%2F..index#0).
 
